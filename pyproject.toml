@@ -1,0 +1,14 @@
+[project]
+name = "motoro"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.3.1",
+    "pandas>=2.3.0",
+    "plotly>=6.2.0",
+    "pyarrow>=20.0.0",
+    "sqlalchemy>=2.0.41",
+    "trino[sqlalchemy]>=0.335.0",
+]
