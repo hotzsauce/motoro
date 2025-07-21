@@ -4,6 +4,7 @@ from motoro.profiles import (
     Profiler,
 )
 from motoro.sql import SqlInterface
+import motoro.viz
 
 # re-export pandas reading functions for convenience
 from pandas import (
