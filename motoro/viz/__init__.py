@@ -13,5 +13,9 @@ pio.templates["modo-light"] = go.layout.Template(layout=light)
 
 # pio.templates.default = "modo-light" # or "modo-dark"
 """
-from motoro.viz.dark import modo_dark_layout as dark
-from motoro.viz.light import modo_light_layout as light
+try:
+    from motoro.viz.dark import modo_dark_layout as dark
+    from motoro.viz.light import modo_light_layout as light
+except ModuleNotFoundError:
+    # user doesn't have plotly installed, probably
+    pass

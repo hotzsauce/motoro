@@ -4,7 +4,8 @@
 use when developing a research article. There are tools for:
 
 - **profiling**: Profiling long time-series data
-- **TB spreads**: Fast & efficicnet top-bottom spread computation
+- **TB spreads**: Fast & efficient top-bottom spread computation
+- **Visualization**: The `motoro.viz` module has Modo Energy `plotly` templates
 
 The actual documentation for the different modules are in the `docs`
 directory.
