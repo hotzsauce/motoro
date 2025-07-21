@@ -64,11 +64,11 @@ ProfiledFrame(shape=(96, 5))
 When plotted, we see how profiling data can give us greater insight to the
 price dynamics:
 
-![ERCOT hub prices](./docs/assets/ercot_hub_ts.png)
+![ERCOT hub prices](./assets/ercot_hub_ts.png)
 
 and
 
-![ERCOT hub profiles](./docs/assets/ercot_hub_profile_ts.png)
+![ERCOT hub profiles](./assets/ercot_hub_profile_ts.png)
 
 ## The `profile` method
 
