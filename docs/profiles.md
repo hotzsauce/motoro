@@ -61,6 +61,15 @@ ProfiledFrame(shape=(96, 5))
 [96 rows x 5 columns]
 ```
 
+When plotted, we see how profiling data can give us greater insight to the
+price dynamics:
+
+![ERCOT hub prices](./docs/assets/ercot_hub_ts.png)
+
+and
+
+![ERCOT hub profiles](./docs/assets/ercot_hub_profile_ts.png)
+
 ## The `profile` method
 
 The `profile` function is the main entry point for creating time-aligned
