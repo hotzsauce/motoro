@@ -4,6 +4,10 @@ from motoro.profiles import (
     Profiler,
 )
 from motoro.sql import SqlInterface
+from motoro.tbs import (
+    tb_spread,
+    TopBottomSpread,
+)
 import motoro.viz
 
 # re-export pandas reading functions for convenience
