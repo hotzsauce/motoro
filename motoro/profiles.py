@@ -20,6 +20,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from pandas.core.groupby.groupby import BaseGroupBy
+from pandas._libs.indexing import NDFrameIndexerBase
 from typing import Callable, Union, Sequence, Optional
 
 
@@ -105,8 +106,8 @@ class ProfiledFrame(object):
               `DataFrame`, the result is wrapped back into a
               `ProfiledFrame`.
             * If it returns a pandas *groupby‑like* object (`Resampler`,
-              `GroupBy`, `Rolling`), that object is wrapped in a
-              `ProfiledGroupby` so that subsequent methods keep the
+              `GroupBy`, `Rolling`), or an indexer, that object is wrapped in a
+              `ProfiledWrapper` so that subsequent methods keep the
               ProfiledFrame semantics.
             * Otherwise the raw attribute is returned unchanged.
 
@@ -124,6 +125,10 @@ class ProfiledFrame(object):
         # handling aggregation methods when MultiIndex column
         underlying = getattr(self.data, attr)
 
+        if isinstance(underlying, NDFrameIndexerBase):
+            # callable(indexer) evaluates to True for pandas indexers?
+            return ProfiledWrapper(underlying, ProfiledFrame)
+
         # if it's a method, wrap it to potentially return ProfiledFrame
         if callable(underlying):
             def wrapped_method(*args, **kwargs):
@@ -134,9 +139,9 @@ class ProfiledFrame(object):
                 # methods that should return ProfiledFrame
                 if isinstance(method_result, pd.DataFrame):
                     return ProfiledFrame(method_result)
-                # handle Resampler, Groupby, Rolling, etc
-                elif isinstance(method_result, BaseGroupBy):
-                    return ProfiledGroupby(method_result, ProfiledFrame)
+                # handle Resampler, Groupby, Rolling, Indexers
+                elif isinstance(method_result, WRAPPER_TYPES):
+                    return ProfiledWrapper(method_result, ProfiledFrame)
                 return method_result
             return wrapped_method
 
@@ -428,10 +433,10 @@ class ProfiledFrame(object):
 
 
 
-
-class ProfiledGroupby(object):
+WRAPPER_TYPES = (BaseGroupBy, NDFrameIndexerBase)
+class ProfiledWrapper(object):
     """
-    Lightweight wrapper around pandas groupby‑like objects.
+    Lightweight wrapper around pandas groupby‑like and indexer objects.
 
     The goal is to insert a return‑type shim so that methods producing a
     `DataFrame` come back as a `ProfiledFrame`, thereby preserving
@@ -451,6 +456,17 @@ class ProfiledGroupby(object):
         """
         self._wrapped = wrapped_obj
         self._return_type = return_type
+
+    def __getitem__(self, key):
+        """
+        Delegate indexed access on the assumption that `wrapped_obj` is a
+        pandas indexer
+        """
+        underlying = self._wrapped[key]
+        if isinstance(underlying, pd.DataFrame):
+            return ProfiledFrame(underlying)
+        else:
+            return underlying
 
     def __getattr__(self, attr):
         """
@@ -473,8 +489,8 @@ class ProfiledGroupby(object):
                 if isinstance(method_result, pd.DataFrame):
                     return ProfiledFrame(method_result)
                 # handle Resampler, Groupby, Rolling, etc
-                elif isinstance(method_result, BaseGroupBy):
-                    return ProfiledGroupby(method_result, ProfiledFrame)
+                elif isinstance(method_result, WRAPPER_TYPE):
+                    return ProfiledWrapper(method_result, ProfiledFrame)
                 return method_result
             return wrapped_method
 
