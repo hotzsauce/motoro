@@ -116,11 +116,7 @@ class ProfiledFrame(object):
         identically to pandas DataFrames while preserving the alignment
         metadata whenever possible.
         """
-        if (
-            (attr in self._internal_aggregations)
-            and
-            isinstance(self.data.columns, pd.MultiIndex)
-        ):
+        if attr in self._internal_aggregations:
             def wrapped_aggregation(*args, **kwargs):
                 return self._aggregate_by_variable(attr, *args, **kwargs)
             return wrapped_aggregation
@@ -286,6 +282,7 @@ class ProfiledFrame(object):
             # user-specified aggregation
             method = getattr(self.data, method_name)
             return method(axis=axis, **kwargs)
+
 
         if isinstance(self.data.columns, pd.MultiIndex):
             # default behavior of aggregating within each outer level
