@@ -88,7 +88,8 @@ motoro.tb_spread(
     coarse=True,
     forward=False,
     contiguous=False,
-    scale=True
+    scale=True,
+    nan_policy="drop",
 )
 ```
 
@@ -102,6 +103,7 @@ motoro.tb_spread(
 - `forward`: Require peaks after troughs
 - `contiguous`: Use contiguous n-hour blocks
 - `scale`: Adjust units when coarse=False
+- `nan_policy`: How to handle NaN values ('drop', 'raise', 'propagate')
 
 ### `TopBottomSpread` Class
 
@@ -114,6 +116,42 @@ calc = mt.TopBottomSpread(n=2, freq='1D', by='hub', coarse=True)
 # Apply to multiple datasets
 spreads1 = calc.calculate(data1)
 spreads2 = calc.calculate(data2)
+```
+
+### Handling  Missing Data
+
+The module provides three policies for handling NaN (missing) values in your
+data:
+
+#### NaN Policy Options
+`'drop'` (Default) - Remove NaN values and calculate with remaining data
+```python
+# price data with generator outages/missing hours
+prices_with_gaps = pd.Series([25, 30, np.nan, 40, 50, np.nan, 20])
+
+# uses only valid prices: [25, 30, 40, 50, 20]
+spreads = tb_spread(prices_with_gaps, n=2, nan_policy='drop')
+# Result: (50+40) - (20+25) = 45
+```
+
+`'raise'` - Error immediately if any NaN values found
+```python
+# strict validation for critical calculations
+try:
+    spreads = tb_spread(prices_with_gaps, n=2, nan_policy='raise')
+except ValueError as e:
+    print(f"Data quality issue: {e}")
+    # handle missing data explicitly
+```
+
+`'propagate'` - Return NaN if any NaN values present
+```python
+# explicit tracking of data quality
+spreads = tb_spread(prices_with_gaps, n=2, nan_policy='propagate')
+# Result: NaN (because input contains NaN values)
+
+# filter to only complete periods
+complete_spreads = spreads.dropna()
 ```
 
 ## Calculation Modes
@@ -348,6 +386,7 @@ correlation_matrix = np.corrcoef(spreads.values.reshape(1, -1))
 | `forward` | bool | False | Require peaks after troughs |
 | `contiguous` | bool | False | Use contiguous blocks |
 | `scale` | bool | True | Adjust units for sub-hourly data |
+| `nan_policy` | str | "drop" | NaN handling policy ('drop', 'raise', 'propagate') |
 
 #### Methods
 

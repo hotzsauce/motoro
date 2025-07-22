@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from typing import Sequence, Optional, Union
+from typing import Literal, Optional, Sequence, Union
 import warnings
 from dataclasses import dataclass
 
@@ -14,6 +14,8 @@ __all__ = [
     "TopBottomSpread",
     "tb_spread",
 ]
+
+NaNPolicy = Literal["drop", "raise", "propagate"]
 
 
 
@@ -59,6 +61,11 @@ class TopBottomSpread(object):
         When `coarse=False` the method divides by the number of
         sub-hourly observations per clock hour so that results remain in
         *$/MWh* (or equivalent) instead of accumulated $.
+    nan_policy : {"drop", "raise", "propagate"}
+        Policy for handling NaN values:
+        - "drop": Remove NaN values and continue with valid data
+        - "raise": Raise ValueError if any NaN values are found
+        - "propagate": Keep NaN values (will result in NaN output)
 
     Notes
     -----
@@ -75,6 +82,7 @@ class TopBottomSpread(object):
     forward: bool = False
     contiguous: bool = False
     scale: bool = True
+    nan_policy: NaNPolicy = "drop"
 
     def __post_init__(self):
         """
@@ -455,6 +463,7 @@ class TopBottomSpread(object):
             n_periods=self.n_periods,
             forward=self.forward,
             contiguous=self.contiguous,
+            nan_policy=self.nan_policy,
         )
 
 
@@ -469,6 +478,7 @@ def tb_spread(
     forward: bool = False,
     contiguous: bool = False,
     scale: bool = True,
+    nan_policy: NaNPolicy = "drop",
 ) -> Union[pd.Series | pd.DataFrame]:
     """
     High-level helper that returns the **top–bottom (TB) spread** of *data*.
@@ -520,6 +530,11 @@ def tb_spread(
     scale : bool, default `True`
         When `coarse=False` multiply/divide so that results remain in the
         same monetary units (e.g., $/MWh) rather than aggregate $.
+    nan_policy : {"drop", "raise", "propagate"}
+        Policy for handling NaN values:
+        - "drop": Remove NaN values and continue with valid data
+        - "raise": Raise ValueError if any NaN values are found
+        - "propagate": Keep NaN values (will result in NaN output)
 
     Returns
     -------
@@ -575,6 +590,7 @@ def tb_spread(
         forward=forward,
         contiguous=contiguous,
         scale=scale,
+        nan_policy=nan_policy,
     )
     return spreadifier.calculate(data)
 
@@ -589,6 +605,7 @@ def _calculate_tb_spread(
     n_periods: int,
     forward: bool,
     contiguous: bool,
+    nan_policy: NaNPolicy,
 ) -> float:
     """
     Dispatch the proper TB-spread algorithm for one window of *values*.
@@ -603,6 +620,11 @@ def _calculate_tb_spread(
         Enforce “peak after trough” ordering.
     contiguous : bool
         Operate on contiguous blocks rather than individual observations.
+    nan_policy : {"drop", "raise", "propagate"}
+        Policy for handling NaN values:
+        - "drop": Remove NaN values and continue with valid data
+        - "raise": Raise ValueError if any NaN values are found
+        - "propagate": Keep NaN values (will result in NaN output)
 
     Returns
     -------
@@ -610,18 +632,29 @@ def _calculate_tb_spread(
         Spread value or `np.nan` when insufficient data.
     """
     if contiguous:
-        rolling = _rolling_accumulation(values, n_periods, "sum")
-        return _spread_with_gap(rolling, n_periods, forward=forward)
+        rolling = _rolling_accumulation(values, n_periods, "sum", nan_policy)
+
+        if nan_policy == "propagate":
+            if any(np.isnan(rolling)):
+                return np.nan
+        else:
+            return _spread_with_gap(rolling, n_periods, forward=forward)
     else:
-        return _total_spread(values, n_periods, forward=forward)
+        return _total_spread(
+            values,
+            n_periods,
+            forward=forward,
+            nan_policy=nan_policy,
+        )
 
 def _rolling_accumulation(
     values: np.ndarray,
     n_periods: int,
     method: str,
-) -> float:
+    nan_policy: NaNPolicy
+) -> np.ndarray:
     """
-    Rolling sum / mean implemented with `numpy.convolve`.
+    Rolling sum / mean implemented.
 
     Returns `np.nan` when the array is shorter than *n_periods*.
 
@@ -633,6 +666,11 @@ def _rolling_accumulation(
         Size of the rolling kernel.
     method : {'sum', 'mean'}
         Aggregation method.
+    nan_policy : {"drop", "raise", "propagate"}
+        Policy for handling NaN values:
+        - "drop": Remove NaN values and continue with valid data
+        - "raise": Raise ValueError if any NaN values are found
+        - "propagate": Keep NaN values (will result in NaN output)
 
     Returns
     -------
@@ -642,12 +680,22 @@ def _rolling_accumulation(
     if len(values) < n_periods:
         return np.nan
 
-    if method == "mean":
-        kernel = np.ones(n_periods) / n_periods
-    elif method == "sum":
-        kernel = np.ones(n_periods)
+    if nan_policy == "raise":
+        if np.any(np.isnan(values)):
+            raise ValueError("NaN values found in input data")
+    elif nan_policy == "propagate":
+        # use values as-is
+        pass
     else:
-        raise ValueError(f"unrecognized method: {method}")
+        # handler with throw an error if nan_policy is not 'drop'
+        values, _ = _handle_nan_values(values, nan_policy)
+
+    if method == "sum":
+        kernel = np.ones(n_periods)
+    elif method == "mean":
+        kernel = np.ones(n_periods) / n_periods
+    else:
+        raise ValueError(f"Unrecognized method: {method}")
 
     acc = np.convolve(values, kernel, mode="valid")
     if len(acc) == 0:
@@ -659,7 +707,8 @@ def _total_spread(
     values: np.ndarray,
     n_periods: int,
     *,
-    forward: bool = False,
+    forward: bool,
+    nan_policy: NaNPolicy,
 ) -> float:
     """
     Non‑contiguous TB‑spread via partial sorting.
@@ -671,15 +720,22 @@ def _total_spread(
     --------
     _total_spread_forward : order‑constrained variant.
     """
-    m = values.size
+    processed, indices = _handle_nan_values(values, nan_policy)
+
+    # might have lost too many observations due to nans
+    m = processed.size
     if m < 2 * n_periods:
         return np.nan
 
+    # short-circuit
+    if nan_policy == "propagate" and np.any(np.isnan(processed)):
+        return np.nan
+
     if forward:
-        return _total_spread_forward(values, n_periods)
+        return _total_spread_forward(processed, n_periods)
     else:
-        lows = np.partition(values, n_periods-1)[:n_periods].sum()
-        highs = np.partition(values, -n_periods)[-n_periods:].sum()
+        lows = np.partition(processed, n_periods-1)[:n_periods].sum()
+        highs = np.partition(processed, -n_periods)[-n_periods:].sum()
         return highs - lows
 
 def _total_spread_forward(
@@ -696,6 +752,11 @@ def _total_spread_forward(
     Complexity
     ----------
     `O(m * n_periods^2)` time and `O(n_periods^2)` memory.
+
+    Notes
+    -----
+    * This does *not* accept NaN policy-related stuff because it's only called
+        after `_handle_nan_values` is in `_total_spread`
     """
     m = values.size
     if n_periods <= 0 or m < 2*n_periods:
@@ -743,7 +804,10 @@ def _spread_with_gap(
 
     Notes
     -----
-    Runs in *O(m)* time using vectorised suffix extrema.
+    * Runs in *O(m)* time using vectorised suffix extrema.
+    * This does *not* accept NaN policy-related stuff because it's only called
+        in `_calculate_tb_spread` after `_rolling_accumualation` is called, and
+        `_rolling_accumulation` handles NaN policy
     """
     m = values.size
     if m < gap:
@@ -932,3 +996,66 @@ def _validate_tb_data(
                 f"Non-numeric columns will be ignored: {list(non_numeric)}",
                 UserWarning,
             )
+
+
+
+#
+# other helpful utilities
+#
+
+def _handle_nan_values(
+    values: np.ndarray,
+    nan_policy: NaNPolicy = "drop",
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Handle NaN values according to the specified policy.
+
+    Parameters
+    ----------
+    values : np.ndarray
+        Input values that may contain NaNs.
+    nan_policy : {"drop", "raise", "propagate"}, default "drop"
+        Policy for handling NaN values:
+        - "drop": Remove NaN values and continue with valid data
+        - "raise": Raise ValueError if any NaN values are found
+        - "propagate": Keep NaN values (will result in NaN output)
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        (processed_values, original_indices)
+        - processed_values: Values after applying NaN policy
+        - original_indices: Original indices of the processed values
+            (for temporal ordering)
+
+    Raises
+    ------
+    ValueError
+        When nan_policy="raise" and NaN values are present.
+    """
+    if nan_policy == "raise":
+        if np.any(np.isnan(values)):
+            nan_count = np.sum(np.isnan(values))
+            raise ValueError(
+                f"NaN values found in input data ({nan_count} out of "
+                f"{len(values)} values). Use nan_policy='drop' to remove them "
+                "or nan_policy='propagate' to keep them."
+            )
+        return values, np.arange(len(values))
+
+    elif nan_policy == "propagate":
+        # Keep all values including NaNs
+        return values, np.arange(len(values))
+
+    elif nan_policy == "drop":
+        # Remove NaN values
+        valid_mask = ~np.isnan(values)
+        valid_values = values[valid_mask]
+        valid_indices = np.where(valid_mask)[0]
+        return valid_values, valid_indices
+
+    else:
+        raise ValueError(
+            f"Invalid nan_policy: '{nan_policy}'. Must be 'drop', 'raise', or "
+            "'propagate'"
+        )
