@@ -158,8 +158,9 @@ while maintaining full pandas compatibility.
 
 ### Smart Aggregations
 
-For DataFrames with MultiIndex columns (i.e., profiling multi-variable data),
-aggregation methods automatically operate within each variable:
+For any profiled data, aggregation methods compute the typical pattern
+across all profiles. For MultiIndex columns, this is done per variable.
+To access pandas default aggregation behavior, use `pf.df.mean()` instead.
 
 ```python
 # profile data with multiple nodes

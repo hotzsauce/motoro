@@ -282,26 +282,27 @@ class ProfiledFrame(object):
     ):
         """
         """
-        if not isinstance(self.data.columns, pd.MultiIndex):
-            # fall back to regular pandas behavior for flat columns
-            method = getattr(self.data, method_name)
-            return method(axis=axis, **kwargs)
-
         if (axis == 0) or (axis == "index"):
             # user-specified aggregation
             method = getattr(self.data, method_name)
             return method(axis=axis, **kwargs)
 
-        # devault behavior of aggregating within each outer level
-        levels = self.data.columns.get_level_values(0).unique()
-        frames = []
-        for level in levels:
-            method = getattr(self.data[level], method_name)
-            df = method(axis=axis, **kwargs).rename(level)
-            frames.append(df)
+        if isinstance(self.data.columns, pd.MultiIndex):
+            # default behavior of aggregating within each outer level
+            levels = self.data.columns.get_level_values(0).unique()
+            frames = []
+            for level in levels:
+                method = getattr(self.data[level], method_name)
+                df = method(axis=axis, **kwargs).rename(level)
+                frames.append(df)
 
-        df = pd.concat(frames, axis="columns")
-        return ProfiledFrame(df, window_hint=self._window_hint)
+            df = pd.concat(frames, axis="columns")
+            return ProfiledFrame(df, window_hint=self._window_hint)
+        else:
+            # profiling a single Series; follow pandas.Groupby lead and
+            # label the result according to the chosen method
+            method = getattr(self.data, method_name)
+            return method(axis=axis, **kwargs).rename(method_name)
 
     def _align_to_end(self) -> ProfiledFrame:
         """
