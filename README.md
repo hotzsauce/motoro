@@ -12,7 +12,7 @@ directory.
 
 # Installing
 
-All of these require having a Github SSH key somewhere on your system
+All of these require having a Github SSH key somewhere on your system.
 
 ## uv
 
@@ -37,4 +37,16 @@ All of these require having a Github SSH key somewhere on your system
 >>> python3 -m venv venv
 >>> source venv/bin/activate
 >>> python3 -m pip install "git+ssh://git@github.com/hotzsauce/motoro.git@main#egg=motoro"
+```
+
+After installing `motoro` via one of these routes, you'll be able to treat it
+like any other python package. Just add it into the block of imports:
+```python
+...
+import io
+
+import motoro as mt
+import numpy as np
+import pandas as pd
+...
 ```
