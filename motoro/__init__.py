@@ -9,6 +9,7 @@ from motoro.tbs import (
     TopBottomSpread,
 )
 import motoro.viz
+from motoro.zips import Unzipper
 
 # re-export pandas reading functions for convenience
 from pandas import (
