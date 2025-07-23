@@ -66,6 +66,17 @@ class ProfiledFrame(object):
         "count", "nunique", "first", "last",
     ]
 
+    _arithmetic_dunder_methods = [
+        "__add__", "__sub__", "__mul__", "__truediv__", "__pow__",
+        "__floordiv__", "__mod__", "__divmod__", "__neg__", "__pos__",
+        "__lshift__", "__rshift__",
+        "__and__", "__or__", "__xor__", "__invert__",
+    ]
+
+    _comparison_dunder_methods = [
+        "__eq__", "__ne__", "__lt__", "__gt__", "__le__", "__ge__",
+    ]
+
     def __init__(self, data: pd.DataFrame, window_hint: str = None):
         """
         Construct a `ProfiledFrame`.
@@ -429,7 +440,32 @@ class ProfiledFrame(object):
         """
         pass
 
+    @classmethod
+    def _attach_dunders(cls):
+        """
+        This will dynamically add all the arithmetic & comparison dunder methods
+        """
+        dunders = cls._arithmetic_dunder_methods + cls._comparison_dunder_methods
+        for name in dunders:
+            print(name)
+            if name in cls.__dict__:
+                # almost the same a `hasattr(cls, name)`, but that checks for
+                # inherited methods, and `object` implements all the comparison
+                # dunders
+                continue
+            # if hasattr(cls, name): # let explicit overrides win
+            #     continue
+            def _make(op):
+                def _op(self, other):
+                    left  = self.data
+                    right = other.data if isinstance(other, ProfiledFrame) else other
+                    res = getattr(left, op)(right)
+                    return cls(res) if isinstance(res, pd.DataFrame) else res
+                return _op
+            setattr(cls, name, _make(name))
 
+# must attach the methods to the class, not the instance
+ProfiledFrame._attach_dunders()
 
 
 
