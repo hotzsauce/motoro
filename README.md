@@ -6,6 +6,9 @@ started to when developing a research article. There are tools for:
 - **profiling**: Profiling long time-series data
 - **TB spreads**: Fast & efficient top-bottom spread computation
 - **Visualization**: The `motoro.viz` module has Modo Energy `plotly` templates
+- **Unzipping**: A lot of publicly available energy market data is stored in
+    zips, and zips of zips. This is a little utility model to make reading those
+    in easier.
 
 The actual documentation for the different modules are in the `docs`
 directory.
