@@ -1,7 +1,7 @@
 # motoro
 
-**Mo**do **to**ols for **r**esearch is a suite of common data operations I
-use when developing a research article. There are tools for:
+**Mo**do **to**ols for **r**esearch is a suite of common data operations I've
+started to when developing a research article. There are tools for:
 
 - **profiling**: Profiling long time-series data
 - **TB spreads**: Fast & efficient top-bottom spread computation
@@ -50,3 +50,9 @@ import numpy as np
 import pandas as pd
 ...
 ```
+
+### What's with the name?
+
+The data science team has a couple repos -- `monodo` and `mofodo` -- that have a
+similar `[Mo] [Project Purpose] [do]` formula. I couldn't think of a name that
+exactly follows that rule, but thought it's a good enough approximation.
