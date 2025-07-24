@@ -97,7 +97,10 @@ class Unzipper(object):
     Selecting files via a Python callable::
 
         def is_2025_q2(file_name: str) -> bool:
-            return "2025-04" <= file_name[:7] <= "2025-06" and file_name.endswith(".csv")
+            return (
+                "2025-04" <= file_name[:7] <= "2025-06"
+                and file_name.endswith(".csv")
+            )
 
         with Unzipper("archive.zip", pattern=is_2025_q2) as uz:
             quarterly = uz.read_streaming()
@@ -130,6 +133,8 @@ class Unzipper(object):
         )
 
         self.reader = reader
+
+        self.skip_macos_metadata = True # will maybe change in the future
 
     def __enter__(self):
         return self
@@ -222,6 +227,53 @@ class Unzipper(object):
     #
     # private and helper methods
     #
+    def _is_macos_metadata(self, file_name: str) -> bool:
+        """
+        Check if file is macOS metadata that should be skipped
+        """
+        if not self.skip_macos_metadata:
+            return False
+
+        macos_patterns = [
+            "__MACOSX/", # resource fork dir
+            ".DS_Store", # finder metadata
+            "._.DS_Store", # AppleDouble DS_Store
+            "._", # AppleDouble files (resource forks)
+            ".fseventsd/", # file systems events
+            ".Spotlight-V100/", # spotlight index
+            ".Trashes/", # trash folder
+        ]
+        return any(
+            file_name.startswith(pat) or file_name.endswith(pat)
+            for pat in macos_patterns
+        )
+
+    def _matches_pattern(self, file_name: str) -> bool:
+        """
+        Decide whether *file_name* satisfies the user‑supplied *pattern*.
+
+        For string patterns the check is performed with
+        `re.Pattern.search`; for callable patterns it defers to the
+        user’s predicate.
+
+        Parameters
+        ----------
+        file_name : str
+            Filename (with path) to test.
+
+        Returns
+        -------
+        bool
+            `True` if the pattern is empty or matches, `False` otherwise.
+        """
+        if self._is_macos_metadata(file_name):
+            return False
+
+        if self.pattern:
+            return self._pattern_call(file_name)
+        else:
+            return True
+
     def _read_or_unzip(
         self,
         file_name: str,
@@ -257,6 +309,9 @@ class Unzipper(object):
         -----
         *No* warnings are issued for skipped files
         """
+        if self._is_macos_metadata(file_name):
+            return pd.DataFrame()
+
         file_path = self.path / file_name
         if self.is_zipfile(file_path):
             inner_bytes = outer.read(file_name)
@@ -296,6 +351,9 @@ class Unzipper(object):
         pandas.DataFrame
             The next dataframe extracted from the archive tree.
         """
+        if self._is_macos_metadata(file_name):
+            return
+
         file_path = self.path / file_name
         if self.is_zipfile(file_path):
             inner_bytes = outer.read(file_name)
@@ -308,29 +366,6 @@ class Unzipper(object):
             if self.is_datafile(file_name) and self._matches_pattern(file_name):
                 df = self._read_datafile(file_name, outer)
                 yield df
-
-    def _matches_pattern(self, file_name: str) -> bool:
-        """
-        Decide whether *file_name* satisfies the user‑supplied *pattern*.
-
-        For string patterns the check is performed with
-        `re.Pattern.search`; for callable patterns it defers to the
-        user’s predicate.
-
-        Parameters
-        ----------
-        file_name : str
-            Filename (with path) to test.
-
-        Returns
-        -------
-        bool
-            `True` if the pattern is empty or matches, `False` otherwise.
-        """
-        if self.pattern:
-            return self._pattern_call(file_name)
-        else:
-            return True
 
     def _read_datafile(
         self,
