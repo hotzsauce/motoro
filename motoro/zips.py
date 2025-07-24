@@ -30,6 +30,8 @@ Notes
 * By default, dataframes are concatenated along the *index* axis
   (``_axis='index'``).
 """
+from __future__ import annotations
+
 from io import BytesIO
 import numpy as np
 import pandas as pd
