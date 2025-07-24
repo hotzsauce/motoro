@@ -447,7 +447,6 @@ class ProfiledFrame(object):
         """
         dunders = cls._arithmetic_dunder_methods + cls._comparison_dunder_methods
         for name in dunders:
-            print(name)
             if name in cls.__dict__:
                 # almost the same a `hasattr(cls, name)`, but that checks for
                 # inherited methods, and `object` implements all the comparison
