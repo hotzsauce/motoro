@@ -802,7 +802,7 @@ class Profiler(object):
         self,
         data: pd.Series | pd.DataFrame,
         freq: str = None,
-        window: str | pd.Timedelta | Sequence[str | pd.Timedelta] = "1d",
+        window: str | pd.Timedelta | Sequence[str | pd.Timedelta] = None,
         starts: str | pd.Timestamp | Sequence[str | pd.Timestamp] = None,
         ends: str | pd.Timestamp | Sequence[str | pd.Timestamp] = None,
         rename: Callable | str = "",
@@ -863,6 +863,10 @@ class Profiler(object):
         """
         _validate_profiling_data(data)
         _validate_profiling_parameters(freq, window, starts, ends)
+
+        # is this the appropriate place for this?
+        if (window is None) and (ends is None):
+            window = "1d"
 
         # will worry about memory efficiency later
         data = data.copy().sort_index()
@@ -927,7 +931,7 @@ def profile(
     window: Union[
         str, pd.Timedelta, pd.offsets.DateOffset,
         Sequence[str | pd.Timedelta, pd.offsets.DateOffset],
-    ] = "1d",
+    ] = None,
     starts: str | pd.Timestamp | Sequence[str | pd.Timestamp] = None,
     ends: str | pd.Timestamp | Sequence[str | pd.Timestamp] = None,
     rename: Callable | str = "",
@@ -939,7 +943,6 @@ def profile(
 
     See `Profiler.profile` for a full parameter reference.
     """
-    # _validate_profiling_parameters(window, rule, starts, ends)
     profiler = Profiler()
     return profiler.profile(
         data,
