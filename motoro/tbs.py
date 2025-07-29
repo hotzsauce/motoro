@@ -51,6 +51,9 @@ class TopBottomSpread(object):
     coarse : bool, default `True`
         If *True*, data are first resampled to hourly means, so `n` is
         interpreted as *hours*. If *False*, the raw sampling interval is kept.
+    normalize: bool, default `True`
+        If *True*, the computed spreads are the **average** TB spread across
+        the `n` hours.
     forward : bool, default `False`
         Require every “peak” to occur *after* its paired “trough” within the
         same window (parenthesis-matching order; see `_total_spread_forward`).
@@ -79,6 +82,7 @@ class TopBottomSpread(object):
     by: Optional[Union[str, Sequence[str]]] = None
     data_freq: str = "auto"
     coarse: bool = True
+    normalize: bool = True
     forward: bool = False
     contiguous: bool = False
     scale: bool = True
@@ -209,11 +213,19 @@ class TopBottomSpread(object):
         grouper = self._get_grouper(df)
         grouped = df.groupby(grouper)
 
-        return (
-            grouped[price_col]
-            .apply(lambda grp: self._tb_spread(grp.values))
-            .rename(f"tb_spread_{self.n}")
-        )
+        if self.normalize:
+            return (
+                grouped[price_col]
+                .apply(lambda grp: self._tb_spread(grp.values))
+                .div(self.n)
+                .rename(f"mean_tb_spread_{self.n}")
+            )
+        else:
+            return (
+                grouped[price_col]
+                .apply(lambda grp: self._tb_spread(grp.values))
+                .rename(f"tb_spread_{self.n}")
+            )
 
     def _calculate_periods_per_window(self) -> int:
         """
@@ -270,11 +282,19 @@ class TopBottomSpread(object):
         grouper = self._get_grouper(series)
         grouped = series.groupby(grouper)
 
-        return (
-            grouped
-            .apply(lambda grp: self._tb_spread(grp.values))
-            .rename(f"tb_spread_{self.n}")
-        )
+        if self.normalize:
+            return (
+                grouped
+                .apply(lambda grp: self._tb_spread(grp.values))
+                .div(self.n)
+                .rename(f"mean_tb_spread_{self.n}")
+            )
+        else:
+            return (
+                grouped
+                .apply(lambda grp: self._tb_spread(grp.values))
+                .rename(f"tb_spread_{self.n}")
+            )
 
     def _get_grouper(
         self,
@@ -475,6 +495,7 @@ def tb_spread(
     by: Optional[Union[str, Sequence[str]]] = None,
     data_freq: str = "auto",
     coarse: bool = True,
+    normalize: bool = True,
     forward: bool = False,
     contiguous: bool = False,
     scale: bool = True,
@@ -521,6 +542,9 @@ def tb_spread(
     coarse : bool, default `True`
         If *True*, down-sample sub-hourly data to hourly means before applying
         the algorithm, so *n* is interpreted in **hours**.
+    normalize: bool, default `True`
+        If *True*, the computed spreads are the **average** TB spread across
+        the `n` hours.
     forward : bool, default `False`
         Require that each selected peak occurs **after** its paired trough
         within the same window.
@@ -587,6 +611,7 @@ def tb_spread(
         by=by,
         data_freq=data_freq,
         coarse=coarse,
+        normalize=normalize,
         forward=forward,
         contiguous=contiguous,
         scale=scale,

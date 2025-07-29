@@ -1,6 +1,6 @@
 [project]
 name = "motoro"
-version = "0.1.2"
+version = "0.1.3"
 description = "Modo Energy tools for research"
 readme = "README.md"
 requires-python = ">=3.13"
