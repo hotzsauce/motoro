@@ -861,12 +861,12 @@ class Profiler(object):
         ...     rename="%Y‑%m‑%d",
         ... )
         """
+        if (window is None) and (ends is None):
+            # default to a daily profile if neither ending parameter is given
+            window = "1d"
+
         _validate_profiling_data(data)
         _validate_profiling_parameters(freq, window, starts, ends)
-
-        # is this the appropriate place for this?
-        if (window is None) and (ends is None):
-            window = "1d"
 
         # will worry about memory efficiency later
         data = data.copy().sort_index()
