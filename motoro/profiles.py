@@ -200,6 +200,88 @@ class ProfiledFrame(object):
         """
         return f"ProfiledFrame(shape={self.data.shape})\n{self.data.__repr__()}"
 
+    def __setattr__(self, name: str, value: Any):
+        """
+        Forward attribute setting to the underlying DataFrame when appropriate.
+
+        This allows users to treat ProfiledFrame like a DataFrame for common
+        operations like setting column names, while preserving internal
+        attributes.
+
+        Parameters
+        ----------
+        name : str
+            The attribute name being set
+        value : object
+            The value to set
+
+        Examples
+        --------
+        >>> pf = ProfiledFrame(data)
+        >>> pf.columns = ['new_col1', 'new_col2']  # Sets underlying DataFrame cols
+        >>> pf.index = new_index                   # Sets underlying DataFrame index
+        """
+        # list of attributes that belong to ProfiledFrame, not the underlying
+        _internal_attrs = {
+            "data", "_window_hint", "_internal_aggregations"
+        }
+
+        # list of DataFrame attributes that are commonly set by users. would need
+        # to add more as needed
+        _delegated_attrs = {
+            "columns", "index", "name", "values",
+        }
+
+        # handle internal ProfiledFrame attributes
+        if name in _internal_attrs or name.startswith('_'):
+            super().__setattr__(name, value)
+            return
+
+        # handle first-time initialization (when self.data doesn't exist yet)
+        if not hasattr(self, 'data'):
+            super().__setattr__(name, value)
+            return
+
+        # Delegate common DataFrame attributes to the underlying data
+        if name in _delegated_attrs and hasattr(self.data, name):
+            setattr(self.data, name, value)
+
+            # Special handling for columns - validate the ProfiledFrame structure
+            if name == 'columns':
+                self._validate_profiled_data()
+            return
+
+        # for any other attribute that exists on the DataFrame, delegate it
+        if hasattr(self.data, name):
+            # check if it's a settable attribute (not a method)
+            attr = getattr(self.data, name)
+            if not callable(attr):
+                setattr(self.data, name, value)
+                return
+
+        # Fall back to setting on ProfiledFrame itself
+        super().__setattr__(name, value)
+
+    def __setitem__(self, key, value):
+        """
+        Column assignment mimicry (pf[col] = values).
+
+        Parameters
+        ----------
+        key : hashable or list-like
+            Column name(s) to assign to
+        value : array-like, scalar, or Series
+            Values to assign
+
+        Examples
+        --------
+        >>> pf['new_column'] = [1, 2, 3, 4, 5]
+        >>> pf[['col1', 'col2']] = other_dataframe
+        """
+        self.data[key] = value
+        # validate structure after assignment
+        self._validate_profiled_data()
+
     def align(
         self,
         method: str | Sequence = "start",
