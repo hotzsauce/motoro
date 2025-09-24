@@ -117,7 +117,7 @@ class Unzipper(object):
         pattern: Optional[Callable | str] = "",
         mode: Optional[str] = "r",
     ):
-        self.path = pathlib.Path(path)
+        self.path = pathlib.Path(path).expanduser().resolve()
         self.mode = mode
 
         if self.is_zipfile(self.path):
